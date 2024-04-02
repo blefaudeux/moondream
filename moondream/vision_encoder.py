@@ -85,7 +85,8 @@ class EncoderWrapper(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.model = nn.ModuleDict({"visual": VisionTransformer()})
+        self.model = nn.ModuleDict({"visual": torch.compile(VisionTransformer())})
+        print(self.model)
 
     def forward(self, x):
         return self.model["visual"](x)
@@ -152,7 +153,7 @@ class VisionEncoder(nn.Module):
         super().__init__()
 
         self.encoder = EncoderWrapper()
-        self.projection = VisionProjection()
+        self.projection = torch.compile(VisionProjection())
 
         self.preprocess = Compose(
             [

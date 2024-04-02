@@ -1016,7 +1016,7 @@ class PhiForCausalLM(PhiPreTrainedModel):
     # Copied from transformers.models.llama.modeling_llama.LlamaForCausalLM.__init__ with Llama->Phi,bias=False->bias=True
     def __init__(self, config):
         super().__init__(config)
-        self.transformer = PhiModel(config)
+        self.transformer = torch.compile(PhiModel(config))
         self.vocab_size = config.vocab_size
         self.lm_head = CausalLMHead(config)
 

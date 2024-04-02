@@ -1,6 +1,8 @@
 from moondream import Moondream, detect_device, LATEST_REVISION
 from transformers import AutoTokenizer
 from PIL import Image
+import torch
+torch._inductor.config.compile_threads = 16
 
 device, dtype = detect_device()
 
