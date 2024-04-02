@@ -92,6 +92,7 @@ class PhiConfig(PretrainedConfig):
 
 class MoondreamConfig(PretrainedConfig):
     model_type = "moondream1"
+    compile_vision_encoder = False
 
     def __init__(self, **kwargs):
         self.phi_config = PhiConfig(**kwargs)

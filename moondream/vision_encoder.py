@@ -85,8 +85,7 @@ class EncoderWrapper(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.model = nn.ModuleDict({"visual": torch.compile(VisionTransformer())})
-        print(self.model)
+        self.model = nn.ModuleDict({"visual": VisionTransformer()})
 
     def forward(self, x):
         return self.model["visual"](x)
@@ -149,11 +148,11 @@ class VisionProjection(nn.Module):
 
 
 class VisionEncoder(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, compile: bool = False) -> None:
         super().__init__()
 
         self.encoder = EncoderWrapper()
-        self.projection = torch.compile(VisionProjection())
+        self.projection = VisionProjection()
 
         self.preprocess = Compose(
             [
@@ -163,6 +162,7 @@ class VisionEncoder(nn.Module):
                 Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             ]
         )
+        self.compile = compile
 
     @property
     def device(self):
@@ -173,6 +173,16 @@ class VisionEncoder(nn.Module):
         return self.projection.mlp.fc1.weight.dtype
 
     def __call__(self, images) -> torch.Tensor:
+        if self.compile:
+            print("Compiling the vision tower")
+            self.projection = torch.compile(
+                self.projection, fullgraph=True  # , mode="reduce-overhead"
+            )
+            self.encoder = torch.compile(
+                self.encoder, fullgraph=True, mode="reduce-overhead"
+            )
+            self.compile = False
+
         if not isinstance(images, list):
             images = [images]
 

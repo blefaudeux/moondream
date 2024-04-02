@@ -12,7 +12,7 @@ class Moondream(PreTrainedModel):
 
     def __init__(self, config):
         super().__init__(config)
-        self.vision_encoder = VisionEncoder()
+        self.vision_encoder = VisionEncoder(compile=config.compile_vision_encoder)
 
         if type(config.phi_config) == dict:
             phi_config = PhiConfig(
