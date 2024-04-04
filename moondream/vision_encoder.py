@@ -177,11 +177,13 @@ class VisionProjection(nn.Module):
 
 class VisionEncoder(nn.Module):
 
-    def __init__(self, use_flash_attn=False):
+    def __init__(self, use_flash_attn=False, compile=False):
         super().__init__()
 
         self.encoder = EncoderWrapper(use_flash_attn)
         self.projection = VisionProjection()
+
+        self.model = nn.Sequential(self.encoder, self.projection)
 
         self.preprocess = Compose(
             [
@@ -191,6 +193,7 @@ class VisionEncoder(nn.Module):
                 Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             ]
         )
+        self._compile = compile
 
     @property
     def device(self):
@@ -204,15 +207,24 @@ class VisionEncoder(nn.Module):
         if not isinstance(images, list):
             images = [images]
 
+        if self._compile:
+            # Apply torch.compile to the model once, after the weights have been loaded
+            print("Compiling VisionEncoder")
+            self.model = torch.compile(
+                self.model, fullgraph=True, mode="reduce-overhead"
+            )
+            self._compile = False
+
         with torch.no_grad():
             # Skip preprocess if images are already tensors
             if not isinstance(images[0], torch.Tensor):
                 images = [self.preprocess(image.convert("RGB")) for image in images]
 
             x = torch.stack(images).to(self.device, dtype=self.dtype)
-            x = rearrange(x, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=14, p2=14)
+            x = rearrange(
+                x, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=14, p2=14
+            ).contiguous()
 
-            x = self.encoder(x)
-            x = self.projection(x)
+            x = self.model(x)
 
             return x

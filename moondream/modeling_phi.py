@@ -190,6 +190,7 @@ def rotate_half(x):
 
 
 # Copied from transformers.models.llama.modeling_llama.apply_rotary_pos_emb
+@torch.compile
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids, unsqueeze_dim=1):
     """Applies Rotary Position Embedding to the query and key tensors.
 
@@ -226,15 +227,25 @@ class PhiMLP(nn.Module):
         self.activation_fn = ACT2FN[config.hidden_act]
         self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
         self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.model = nn.Sequential(
+            self.fc1,
+            self.activation_fn,
+            self.fc2,
+        )
+        if config.compile:
+            self.model = torch.compile(
+                self.model, fullgraph=True, mode="reduce-overhead"
+            )
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        hidden_states = self.fc1(hidden_states)
-        hidden_states = self.activation_fn(hidden_states)
-        hidden_states = self.fc2(hidden_states)
-        return hidden_states
+        # hidden_states = self.fc1(hidden_states)
+        # hidden_states = self.activation_fn(hidden_states)
+        # hidden_states = self.fc2(hidden_states)
+        return self.model(hidden_states)
 
 
 # Copied from transformers.models.llama.modeling_llama.repeat_kv with llama->phi
+@torch.compile
 def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     """
     This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
@@ -273,6 +284,7 @@ class PhiAttention(nn.Module):
         self.rope_theta = config.rope_theta
         self.partial_rotary_factor = config.partial_rotary_factor
         self.is_causal = True
+        self._compile = config.compile
 
         if (self.head_dim * self.num_heads) != self.hidden_size:
             raise ValueError(
@@ -806,6 +818,10 @@ class PhiModel(PhiPreTrainedModel):
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
+
+        if config.compile:
+            self.h = nn.ModuleList([torch.compile(layer, fullgraph=True, mode="reduce-overhead") for layer in self.h])  # type: ignore
+
         self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"
 
         self.gradient_checkpointing = False
@@ -976,6 +992,7 @@ class CausalLMHead(nn.Module):
         self.ln = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.linear = nn.Linear(config.hidden_size, config.vocab_size)
 
+    @torch.compile
     def forward(self, hidden_states):
         return self.linear(self.ln(hidden_states))
 

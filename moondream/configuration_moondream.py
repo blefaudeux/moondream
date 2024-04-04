@@ -28,6 +28,7 @@ class PhiConfig(PretrainedConfig):
         qk_layernorm=False,
         bos_token_id=1,
         eos_token_id=2,
+        compile=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -52,6 +53,7 @@ class PhiConfig(PretrainedConfig):
         self.rope_scaling = rope_scaling
         self.partial_rotary_factor = partial_rotary_factor
         self.qk_layernorm = qk_layernorm
+        self.compile = compile
         self._rope_scaling_validation()
 
         super().__init__(
